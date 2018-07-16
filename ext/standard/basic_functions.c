@@ -5296,7 +5296,7 @@ PHP_FUNCTION(php_strip_whitespace)
 		Z_PARAM_PATH(filename, filename_len)
 	ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	php_output_start_default();
+	//*****php_output_start_default();
 
 	memset(&file_handle, 0, sizeof(file_handle));
 	file_handle.type = ZEND_HANDLE_FILENAME;
@@ -5306,17 +5306,82 @@ PHP_FUNCTION(php_strip_whitespace)
 	zend_save_lexical_state(&original_lex_state);
 	if (open_file_for_scanning(&file_handle) == FAILURE) {
 		zend_restore_lexical_state(&original_lex_state);
-		php_output_end();
+		//********php_output_end();
 		RETURN_EMPTY_STRING();
 	}
 
-	zend_strip();
+//	zend_strip();
+//<<<<<<<<<<<<<<<<<<<
+	//zend_string *output = zend_string_init("", 0, 0);
+	smart_str output = {0};
+	zval token;
+	int token_type;
+	int prev_space = 0;
 
+	while ((token_type=lex_scan(&token, NULL))) {
+		switch (token_type) {
+			case T_WHITESPACE:
+				if (!prev_space) {
+					//zend_write(" ", sizeof(" ") - 1);
+					smart_str_appends(&output, " ");
+					prev_space = 1;
+				}
+						/* lack of break; is intentional */
+			case T_COMMENT:
+			case T_DOC_COMMENT:
+				ZVAL_UNDEF(&token);
+				continue;
+
+			case T_END_HEREDOC:
+				//zend_write((char*)LANG_SCNG(yy_text), LANG_SCNG(yy_leng));
+				smart_str_appendl(&output, (char*)LANG_SCNG(yy_text), LANG_SCNG(yy_leng));
+				/* read the following character, either newline or ; */
+				if (lex_scan(&token, NULL) != T_WHITESPACE) {
+					//zend_write((char*)LANG_SCNG(yy_text), LANG_SCNG(yy_leng));
+					smart_str_appendl(&output, (char*)LANG_SCNG(yy_text), LANG_SCNG(yy_leng));
+				}
+				//zend_write("\n", sizeof("\n") - 1);
+				smart_str_appends(&output, "\n");
+				prev_space = 1;
+				ZVAL_UNDEF(&token);
+				continue;
+
+			default:
+				//zend_write((char*)LANG_SCNG(yy_text), LANG_SCNG(yy_leng));
+				smart_str_appendl(&output, (char*)LANG_SCNG(yy_text), LANG_SCNG(yy_leng));
+				break;
+		}
+
+		if (Z_TYPE(token) == IS_STRING) {
+			switch (token_type) {
+				case T_OPEN_TAG:
+				case T_OPEN_TAG_WITH_ECHO:
+				case T_CLOSE_TAG:
+				case T_WHITESPACE:
+				case T_COMMENT:
+				case T_DOC_COMMENT:
+					break;
+
+				default:
+					zval_ptr_dtor_str(&token);
+					break;
+			}
+		}
+		prev_space = 0;
+		ZVAL_UNDEF(&token);
+	}
+
+	/* Discard parse errors thrown during tokenization */
+	zend_clear_exception();
+//>>>>>>>>>>>>>>>>>>>>>>>>
 	zend_destroy_file_handle(&file_handle);
 	zend_restore_lexical_state(&original_lex_state);
 
-	php_output_get_contents(return_value);
-	php_output_discard();
+	smart_str_0(&output);
+	RETURN_STR(output.s);
+	//smart_str_free(output);
+	//******php_output_get_contents(return_value);
+	//******php_output_discard();
 }
 /* }}} */
 
