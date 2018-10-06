@@ -446,6 +446,98 @@ static int zend_ast_add_array_element(zval *result, zval *offset, zval *expr)
 	return SUCCESS;
 }
 
+static int zend_ast_add_unpacked_element(zval *result, zval *expr) {
+	if (EXPECTED(Z_TYPE_P(expr) == IS_ARRAY)) {
+		HashTable *ht = Z_ARRVAL_P(expr);
+		zval *val;
+		zend_string *key;
+		
+		ZEND_HASH_FOREACH_STR_KEY_VAL(ht, key, val) {
+			if (key) {
+				zend_throw_error(NULL, "Cannot unpack array with string keys");
+				return FAILURE;
+			} else {
+				Z_TRY_ADDREF_P(val);
+				if (!zend_hash_next_index_insert(Z_ARRVAL_P(result), val)) {
+					zend_error(E_WARNING, "Cannot add element to the array as the next element is already occupied");
+					zval_ptr_dtor_nogc(val);
+				}
+			}
+		} ZEND_HASH_FOREACH_END();
+	} else if (EXPECTED(Z_TYPE_P(expr) == IS_OBJECT)) {
+		zend_class_entry *ce = Z_OBJCE_P(expr);
+		zend_object_iterator *iter;
+
+		if (!ce || !ce->get_iterator) {
+			zend_throw_error(NULL, "Only arrays and Traversables can be unpacked");
+			return FAILURE;
+		} else {
+			iter = ce->get_iterator(ce, expr, 0);
+			if (UNEXPECTED(!iter)) {
+				if (!EG(exception)) {
+					zend_throw_exception_ex(
+						NULL, 0, "Object of type %s did not create an Iterator", ZSTR_VAL(ce->name)
+					);
+				}
+				return FAILURE;
+			}
+			
+			if (iter->funcs->rewind) {
+				iter->funcs->rewind(iter);
+			}
+			
+			for (; iter->funcs->valid(iter) == SUCCESS; ) {
+				zval *val;
+
+				if (UNEXPECTED(EG(exception) != NULL)) {
+					break;
+				}
+
+				val = iter->funcs->get_current_data(iter);
+				if (UNEXPECTED(EG(exception) != NULL)) {
+					break;
+				}
+
+				if (iter->funcs->get_current_key) {
+					zval key;
+					iter->funcs->get_current_key(iter, &key);
+					if (UNEXPECTED(EG(exception) != NULL)) {
+						break;
+					}
+
+					if (UNEXPECTED(Z_TYPE(key) != IS_LONG)) {
+						zend_throw_error(NULL,
+							(Z_TYPE(key) == IS_STRING) ?
+								"Cannot unpack Traversable with string keys" :
+								"Cannot unpack Traversable with non-integer keys");
+						zval_ptr_dtor(&key);
+						break;
+					}
+				}
+
+				ZVAL_DEREF(val);
+				Z_TRY_ADDREF_P(val);
+
+				if (!zend_hash_next_index_insert(Z_ARRVAL_P(result), val)) {
+					zend_error(E_WARNING, "Cannot add element to the array as the next element is already occupied");
+					zval_ptr_dtor_nogc(val);
+				}
+
+				iter->funcs->move_forward(iter);
+			}
+
+			zend_iterator_dtor(iter);
+		}
+	} else if (EXPECTED(Z_ISREF_P(expr))) {
+		expr = Z_REFVAL_P(expr);
+		return zend_ast_add_unpacked_element(result, expr);
+	} else {
+		zend_throw_error(NULL, "Only arrays and Traversables can be unpacked");
+		return FAILURE;
+	}
+	return SUCCESS;
+}
+
 ZEND_API int ZEND_FASTCALL zend_ast_evaluate(zval *result, zend_ast *ast, zend_class_entry *scope)
 {
 	zval op1, op2;
@@ -642,6 +734,18 @@ ZEND_API int ZEND_FASTCALL zend_ast_evaluate(zval *result, zend_ast *ast, zend_c
 				array_init(result);
 				for (i = 0; i < list->children; i++) {
 					zend_ast *elem = list->child[i];
+					if (elem->kind == ZEND_AST_UNPACK) {
+						if (UNEXPECTED(zend_ast_evaluate(&op1, elem->child[0], scope) != SUCCESS)) {
+							zval_ptr_dtor_nogc(result);
+							return FAILURE;
+						}
+						if (UNEXPECTED(zend_ast_add_unpacked_element(result, &op1) != SUCCESS)) {
+							zval_ptr_dtor_nogc(&op1);
+							zval_ptr_dtor_nogc(result);
+							return FAILURE;
+						}
+						continue;
+					}
 					if (elem->child[1]) {
 						if (UNEXPECTED(zend_ast_evaluate(&op1, elem->child[1], scope) != SUCCESS)) {
 							zval_ptr_dtor_nogc(result);
