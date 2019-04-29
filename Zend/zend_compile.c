@@ -6892,15 +6892,21 @@ static zend_bool zend_try_ct_eval_array(zval *result, zend_ast *ast) /* {{{ */
 			zend_error(E_COMPILE_ERROR, "Cannot use empty array elements in arrays");
 		}
 
-		zend_eval_const_expr(&elem_ast->child[0]);
 		if (elem_ast->kind != ZEND_AST_UNPACK) {
+			zend_eval_const_expr(&elem_ast->child[0]);
 			zend_eval_const_expr(&elem_ast->child[1]);
-		}
-
-		if (elem_ast->attr /* by_ref */ || elem_ast->child[0]->kind != ZEND_AST_ZVAL
-			|| (elem_ast->kind != ZEND_AST_UNPACK && elem_ast->child[1] && elem_ast->child[1]->kind != ZEND_AST_ZVAL)
-		) {
-			is_constant = 0;
+			
+			if (elem_ast->attr /* by_ref */ || elem_ast->child[0]->kind != ZEND_AST_ZVAL
+				|| (elem_ast->child[1] && elem_ast->child[1]->kind != ZEND_AST_ZVAL)
+			) {
+				is_constant = 0;
+			}
+		} else {
+			zend_eval_const_expr(&elem_ast->child[0]);
+			
+			if (elem_ast->child[0]->kind != ZEND_AST_ZVAL) {
+				is_constant = 0;
+			}
 		}
 
 		last_elem_ast = elem_ast;
