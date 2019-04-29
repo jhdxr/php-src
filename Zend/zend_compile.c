@@ -2535,6 +2535,11 @@ static void zend_compile_list_assign(
 				continue;
 			}
 		}
+		
+		if (elem_ast->kind == ZEND_AST_UNPACK) {
+			zend_error(E_COMPILE_ERROR,
+					"Spread operator in assignments are not supported");
+		}
 
 		var_ast = elem_ast->child[0];
 		key_ast = elem_ast->child[1];
