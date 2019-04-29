@@ -5579,6 +5579,7 @@ ZEND_VM_C_LABEL(add_again):
 				if (!zend_hash_next_index_insert(Z_ARRVAL_P(EX_VAR(opline->result.var)), val)) {
 					zend_cannot_add_element();
 					zval_ptr_dtor_nogc(val);
+					break;
 				}
 			}
 		} ZEND_HASH_FOREACH_END();
