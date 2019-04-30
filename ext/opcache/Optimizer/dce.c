@@ -111,6 +111,7 @@ static inline zend_bool may_have_side_effects(
 		case ZEND_ROPE_ADD:
 		case ZEND_INIT_ARRAY:
 		case ZEND_ADD_ARRAY_ELEMENT:
+		case ZEND_ADD_ARRAY_UNPACK:
 		case ZEND_SPACESHIP:
 		case ZEND_STRLEN:
 		case ZEND_COUNT:

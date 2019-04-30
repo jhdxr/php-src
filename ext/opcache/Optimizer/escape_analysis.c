@@ -239,6 +239,7 @@ static int is_local_def(zend_op_array *op_array, zend_ssa *ssa, int def, int var
 		switch (opline->opcode) {
 			case ZEND_INIT_ARRAY:
 			case ZEND_ADD_ARRAY_ELEMENT:
+			case ZEND_ADD_ARRAY_UNPACK:
 			case ZEND_QM_ASSIGN:
 			case ZEND_ASSIGN:
 				return 1;
