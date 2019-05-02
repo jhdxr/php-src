@@ -247,6 +247,8 @@ static zend_bool can_replace_op1(
 		case ZEND_INIT_ARRAY:
 		case ZEND_ADD_ARRAY_ELEMENT:
 			return !(opline->extended_value & ZEND_ARRAY_ELEMENT_REF);
+		case ZEND_ADD_ARRAY_UNPACK:
+			return 0;
 		case ZEND_YIELD:
 			return !(op_array->fn_flags & ZEND_ACC_RETURN_REFERENCE);
 		case ZEND_VERIFY_RETURN_TYPE:
@@ -2168,7 +2170,8 @@ static int try_remove_definition(sccp_ctx *ctx, int var_num, zend_ssa_var *var, 
 						&& opline->opcode != ZEND_ROPE_INIT
 						&& opline->opcode != ZEND_ROPE_ADD
 						&& opline->opcode != ZEND_INIT_ARRAY
-						&& opline->opcode != ZEND_ADD_ARRAY_ELEMENT) {
+						&& opline->opcode != ZEND_ADD_ARRAY_ELEMENT
+						&& opline->opcode != ZEND_ADD_ARRAY_UNPACK) {
 					/* Replace with QM_ASSIGN */
 					zend_uchar old_type = opline->result_type;
 					uint32_t old_var = opline->result.var;

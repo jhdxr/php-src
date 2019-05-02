@@ -3275,6 +3275,19 @@ static int zend_update_type_info(const zend_op_array *op_array,
 				UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
 			}
 			break;
+		case ZEND_ADD_ARRAY_UNPACK:
+			if (opline->op1_type == IS_CV && ssa_ops[i].op1_def >= 0) {
+				tmp = t1;
+				tmp |= MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF;
+				UPDATE_SSA_TYPE(tmp, ssa_ops[i].op1_def);
+			}
+			if (ssa_ops[i].result_def >= 0) {
+				tmp = MAY_BE_RC1|MAY_BE_ARRAY;
+				tmp |= MAY_BE_ARRAY_OF_ANY|MAY_BE_ARRAY_OF_REF;
+				tmp |= MAY_BE_ARRAY_KEY_LONG;
+				UPDATE_SSA_TYPE(tmp, ssa_ops[i].result_def);
+			}
+			break;
 		case ZEND_UNSET_CV:
 			tmp = MAY_BE_UNDEF;
 			if (!op_array->function_name) {
@@ -3451,6 +3464,7 @@ static int zend_update_type_info(const zend_op_array *op_array,
 						case ZEND_YIELD:
 						case ZEND_INIT_ARRAY:
 						case ZEND_ADD_ARRAY_ELEMENT:
+						case ZEND_ADD_ARRAY_UNPACK:
 						case ZEND_RETURN_BY_REF:
 						case ZEND_VERIFY_RETURN_TYPE:
 						case ZEND_MAKE_REF:
@@ -4661,6 +4675,8 @@ int zend_may_throw(const zend_op *opline, zend_op_array *op_array, zend_ssa *ssa
 		case ZEND_INIT_ARRAY:
 		case ZEND_ADD_ARRAY_ELEMENT:
 			return (opline->op2_type != IS_UNUSED) && (t2 & (MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE));
+		case ZEND_ADD_ARRAY_UNPACK:
+			return t1 & (MAY_BE_ARRAY|MAY_BE_OBJECT) != 0;
 		case ZEND_STRLEN:
 			return (t1 & MAY_BE_ANY) != MAY_BE_STRING;
 		case ZEND_COUNT:

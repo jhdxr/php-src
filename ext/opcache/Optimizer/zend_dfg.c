@@ -79,6 +79,9 @@ int zend_build_dfg(const zend_op_array *op_array, const zend_cfg *cfg, zend_dfg 
 							goto op1_def;
 						}
 						goto op1_use;
+					case ZEND_ADD_ARRAY_UNPACK:
+						/* we don't know if the unpacked array contains reference, so assume yes */
+						goto op1_def;
 					case ZEND_FE_RESET_R:
 					case ZEND_SEND_VAR:
 					case ZEND_CAST:
