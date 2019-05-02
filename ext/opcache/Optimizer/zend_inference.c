@@ -4676,7 +4676,7 @@ int zend_may_throw(const zend_op *opline, zend_op_array *op_array, zend_ssa *ssa
 		case ZEND_ADD_ARRAY_ELEMENT:
 			return (opline->op2_type != IS_UNUSED) && (t2 & (MAY_BE_ARRAY|MAY_BE_OBJECT|MAY_BE_RESOURCE));
 		case ZEND_ADD_ARRAY_UNPACK:
-			return t1 & (MAY_BE_ARRAY|MAY_BE_OBJECT) != 0;
+			return (t1 & (MAY_BE_ARRAY|MAY_BE_OBJECT)) != 0;
 		case ZEND_STRLEN:
 			return (t1 & MAY_BE_ANY) != MAY_BE_STRING;
 		case ZEND_COUNT:
