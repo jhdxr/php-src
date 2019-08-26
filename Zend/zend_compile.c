@@ -2805,6 +2805,7 @@ static void zend_compile_list_assign(
 	zend_ast_list *list = zend_ast_get_list(ast);
 	uint32_t i;
 	zend_bool has_elems = 0;
+	zend_bool has_spread_operator = 0;
 	zend_bool is_keyed =
 		list->children > 0 && list->child[0] != NULL && list->child[0]->child[1] != NULL;
 
@@ -2827,14 +2828,24 @@ static void zend_compile_list_assign(
 			}
 		}
 
-		if (elem_ast->kind == ZEND_AST_UNPACK) {
-			zend_error(E_COMPILE_ERROR,
-					"Spread operator is not supported in assignments");
+		if (has_spread_operator) {
+			zend_error(E_COMPILE_ERROR, "Cannot use positional assignment after spread operator");
 		}
-
-		var_ast = elem_ast->child[0];
-		key_ast = elem_ast->child[1];
+		
+		if (elem_ast->kind == ZEND_AST_UNPACK) {
+			has_spread_operator = 1;
+			var_ast = elem_ast->child[0];
+			key_ast = NULL;
+		} else {
+			var_ast = elem_ast->child[0];
+			key_ast = elem_ast->child[1];
+		}
 		has_elems = 1;
+
+		if (has_spread_operator && is_keyed) {
+			zend_error(E_COMPILE_ERROR,
+						"Spread operator is not supported in keyed array assignments");
+		}
 
 		if (is_keyed) {
 			if (key_ast == NULL) {
@@ -2858,6 +2869,44 @@ static void zend_compile_list_assign(
 		}
 
 		zend_verify_list_assign_target(var_ast, old_style);
+
+		if (elem_ast->kind == ZEND_AST_UNPACK) {
+			uint32_t opnum_reset, opnum_fetch;
+			znode value_node, reset_node, tmp_node;
+			zend_compile_expr(&value_node, var_ast);
+			
+			zend_emit_op(&value_node, ZEND_INIT_ARRAY, NULL, NULL);
+			
+			
+			opnum_reset = get_next_op_number();
+			zend_emit_op(&reset_node, ZEND_FE_RESET_R, expr_node, NULL);
+			
+			zend_begin_loop(ZEND_FE_FREE, &reset_node, 0);
+			
+			opnum_fetch = get_next_op_number();
+			opline = zend_emit_op(NULL, ZEND_FE_FETCH_R, &reset_node, NULL);
+			opline->op2_type = IS_VAR;
+			opline->op2.var = get_temporary_variable();
+			GET_NODE(&tmp_node, opline->op2);
+			
+			opline = zend_emit_op(NULL, ZEND_ADD_ARRAY_ELEMENT,
+				&tmp_node, NULL);
+			SET_NODE(opline->result, &value_node);
+			
+			CG(zend_lineno) = ast->lineno;
+			zend_emit_jump(opnum_fetch);
+			
+			opline = &CG(active_op_array)->opcodes[opnum_reset];
+			opline->op2.opline_num = get_next_op_number();
+
+			opline = &CG(active_op_array)->opcodes[opnum_fetch];
+			opline->extended_value = get_next_op_number();
+
+			zend_end_loop(opnum_fetch, &reset_node);
+
+			opline = zend_emit_op(NULL, ZEND_FE_FREE, &reset_node, NULL);
+			continue;
+		}
 
 		opline = zend_emit_op(&fetch_result,
 			elem_ast->attr ? (expr_node->op_type == IS_CV ? ZEND_FETCH_DIM_W : ZEND_FETCH_LIST_W) : ZEND_FETCH_LIST_R, expr_node, &dim_node);
