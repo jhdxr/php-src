@@ -45,4 +45,4 @@ jobs:
           libxslt1-dev \
           libzip-dev \
     - name: build
-    - run: ../../travis/compile.sh
+      run: ../../travis/compile.sh
