@@ -16,4 +16,4 @@ jobs:
     - name: Install Dependencies
       run: sudo ./.github/workflows/install-deps-apt.sh 
     - name: build
-      run: ../../travis/compile.sh
+      run: ./travis/compile.sh
