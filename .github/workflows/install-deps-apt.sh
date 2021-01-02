@@ -1,4 +1,6 @@
+#!/bin/sh
 apt-get update
+
 apt-get -yq install \
     locales \
     language-pack-de \
